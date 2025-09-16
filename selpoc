@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 # selpoc: compute COM/COG, bbox and Rg for a selection, with Vina/gnina box output
 import argparse, os, sys, json
-import numpy as np
+
+# 尝试导入依赖，如果失败则提供安装指导
+try:
+    import numpy as np
+except ImportError:
+    print("[err] NumPy not found. Please install it:")
+    print("  conda install numpy")
+    print("  # or: pip install numpy")
+    sys.exit(1)
 
 try:
     import MDAnalysis as mda
-except Exception:
-    sys.exit("[err] MDAnalysis not found. Install via:\n"
-             "  pip install MDAnalysis\n"
-             "  # or: conda install -c conda-forge mdanalysis")
+except ImportError:
+    print("[err] MDAnalysis not found. Please install it:")
+    print("  conda install -c conda-forge mdanalysis")
+    print("  # or: pip install MDAnalysis")
+    sys.exit(1)
 
 def np_arr(x): return np.asarray(x, dtype=float)
 
