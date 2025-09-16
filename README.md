@@ -1,129 +1,129 @@
 # selpoc
 
-A command-line tool for protein structure analysis and molecular docking box generation.
+蛋白质结构分析和分子对接盒子生成的命令行工具。
 
-## Features
+## 功能特点
 
-- **Center of Mass (COM)** and **Center of Geometry (COG)** calculation
-- **Bounding box** analysis for protein regions
-- **Radius of gyration (Rg)** computation
-- **Vina/gnina box parameter generation** for molecular docking
-- **Multi-chain residue selection** with flexible syntax
-- **Range syntax support** for efficient residue specification
+- **质心 (COM)** 和 **几何中心 (COG)** 计算
+- 蛋白质区域的**边界框**分析
+- **回转半径 (Rg)** 计算
+- 分子对接的 **Vina/gnina 盒子参数生成**
+- 灵活语法的**多链残基选择**
+- 高效残基指定的**范围语法支持**
 
-## Installation
+## 安装
 
-### Prerequisites
+### 依赖要求
 
 - Python 3.7+
-- MDAnalysis library
+- MDAnalysis 库
 
-### Install Dependencies
+### 安装依赖
 
 ```bash
 pip install MDAnalysis numpy
 ```
 
-### Install selpoc
+### 安装 selpoc
 
 ```bash
-# Clone the repository
+# 克隆仓库
 git clone https://github.com/yourusername/selpoc.git
 cd selpoc
 
-# Make executable and install globally
+# 使其可执行并全局安装
 chmod +x selpoc
 cp selpoc ~/.local/bin/selpoc
 
-# Ensure ~/.local/bin is in your PATH
+# 确保 ~/.local/bin 在您的 PATH 中
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-## Usage
+## 使用方法
 
-### Basic Usage
+### 基本用法
 
 ```bash
-# View PDB structure information
+# 查看 PDB 结构信息
 selpoc protein.pdb --pdbview
 
-# Select residues from all chains
+# 选择所有链的残基
 selpoc protein.pdb --resid 45 67 120
 
-# Select residue range
+# 选择残基范围
 selpoc protein.pdb --resid 470-476
 
-# Select from specific chain
+# 选择特定链
 selpoc protein.pdb --chain A --resid 45-50
 ```
 
-### Multi-chain Selection
+### 多链选择
 
 ```bash
-# Select specific residues from different chains
+# 选择不同链的特定残基
 selpoc protein.pdb --resid A:471 B:472
 
-# Select ranges from different chains
+# 选择不同链的范围
 selpoc protein.pdb --resid A:470-476 B:480-485
 
-# Mix single residues and ranges
+# 混合单个残基和范围
 selpoc protein.pdb --resid A:470-472 B:475 A:480-485
 ```
 
-### Molecular Docking Box Generation
+### 分子对接盒子生成
 
 ```bash
-# Generate Vina/gnina box parameters
+# 生成 Vina/gnina 盒子参数
 selpoc protein.pdb --resid A:470-476 --box --box-pad 5.0
 
-# Output: --center_x -18.112 --center_y 3.054 --center_z 21.264 --size_x 22.617 --size_y 21.97 --size_z 21.024
+# 输出: --center_x -18.112 --center_y 3.054 --center_z 21.264 --size_x 22.617 --size_y 21.97 --size_z 21.024
 ```
 
-### Advanced Options
+### 高级选项
 
 ```bash
-# Include center of geometry
+# 包含几何中心
 selpoc protein.pdb --resid A:470-476 --geom-center
 
-# Include radius of gyration
+# 包含回转半径
 selpoc protein.pdb --resid A:470-476 --radius
 
-# JSON output
+# JSON 输出
 selpoc protein.pdb --resid A:470-476 --json
 
-# Custom MDAnalysis selection
+# 自定义 MDAnalysis 选择
 selpoc protein.pdb --sel "protein and name CA and resid 470:476"
 ```
 
-## Selection Formats
+## 选择格式
 
-### Residue ID Formats
+### 残基 ID 格式
 
-1. **Simple format**: `45 67 120` (selects from all chains)
-2. **Range format**: `470-476` (selects residues 470 through 476)
-3. **Chain-specific**: `A:471 B:472` (selects residue 471 from chain A, 472 from chain B)
-4. **Chain ranges**: `A:470-476` (selects residues 470-476 from chain A)
-5. **Mixed formats**: `A:470-472 B:475 A:480-485`
+1. **简单格式**: `45 67 120` (从所有链选择)
+2. **范围格式**: `470-476` (选择470到476残基)
+3. **链特定**: `A:471 B:472` (从链A选择471残基，从链B选择472残基)
+4. **链范围**: `A:470-476` (从链A选择470-476残基)
+5. **混合格式**: `A:470-472 B:475 A:480-485`
 
-### Chain Restriction
+### 链限制
 
-Use `--chain` with simple formats:
+对简单格式使用 `--chain`：
 ```bash
-selpoc protein.pdb --chain A --resid 470-476  # Only chain A
+selpoc protein.pdb --chain A --resid 470-476  # 仅链A
 ```
 
-Cannot combine `--chain` with chain-specific formats:
+不能将 `--chain` 与链特定格式组合：
 ```bash
-# ❌ This will error
+# ❌ 这会报错
 selpoc protein.pdb --chain A --resid A:470 B:471
 
-# ✅ Use this instead
+# ✅ 应该使用这种方式
 selpoc protein.pdb --resid A:470 B:471
 ```
 
-## Output
+## 输出
 
-### Standard Output
+### 标准输出
 ```
 PDB        : /path/to/protein.pdb
 Selection  : (segid A and resid 470 471 472 473 474 475 476)  (atoms: 77)
@@ -133,12 +133,12 @@ BBox max   : [-12.042   9.078  26.229]
 Box size   : [12.617 11.97  11.024]
 ```
 
-### Vina Box Output
+### Vina 盒子输出
 ```
 --center_x -18.112 --center_y 3.054 --center_z 21.264 --size_x 22.617 --size_y 21.97 --size_z 21.024
 ```
 
-This output can be directly used in Vina or gnina commands:
+此输出可直接用于 Vina 或 gnina 命令：
 ```bash
 vina --receptor protein.pdbqt --ligand ligand.pdbqt \
      --center_x -18.112 --center_y 3.054 --center_z 21.264 \
@@ -146,65 +146,65 @@ vina --receptor protein.pdbqt --ligand ligand.pdbqt \
      --out result.pdbqt
 ```
 
-## Examples
+## 示例
 
-### Binding Site Analysis
+### 结合位点分析
 ```bash
-# Analyze binding pocket residues
+# 分析结合口袋残基
 selpoc protein.pdb --resid A:195-205 B:310-320 --box --box-pad 3.0 --radius
 ```
 
-### Multi-domain Protein
+### 多结构域蛋白质
 ```bash
-# Select residues from multiple domains
+# 选择多个结构域的残基
 selpoc protein.pdb --resid A:50-80 A:150-180 B:200-230
 ```
 
-### Large Range Selection
+### 大范围选择
 ```bash
-# Select large consecutive range efficiently
+# 高效选择大的连续范围
 selpoc protein.pdb --resid A:100-200 --geom-center --radius
 ```
 
-## Command-line Options
+## 命令行选项
 
-| Option | Description |
-|--------|-------------|
-| `--pdbview` | Show PDB chain information and residue ranges |
-| `--resid` | Specify residue IDs (supports ranges and chain notation) |
-| `--sel` | Custom MDAnalysis selection string |
-| `--chain` | Restrict selection to specific chain (simple format only) |
-| `--geom-center` | Calculate center of geometry (COG) |
-| `--radius` | Calculate radius of gyration |
-| `--box` | Generate Vina/gnina box parameters |
-| `--box-center` | Box center type: `com` (default) or `cog` |
-| `--box-pad` | Padding in Å (default: 0.0) |
-| `--box-round` | Decimal places for box output (default: 3) |
-| `--json` | Output results as JSON |
+| 选项 | 描述 |
+|------|------|
+| `--pdbview` | 显示 PDB 链信息和残基范围 |
+| `--resid` | 指定残基 ID（支持范围和链标记） |
+| `--sel` | 自定义 MDAnalysis 选择字符串 |
+| `--chain` | 限制选择到特定链（仅简单格式） |
+| `--geom-center` | 计算几何中心 (COG) |
+| `--radius` | 计算回转半径 |
+| `--box` | 生成 Vina/gnina 盒子参数 |
+| `--box-center` | 盒子中心类型：`com`（默认）或 `cog` |
+| `--box-pad` | 填充距离，单位 Å（默认：0.0） |
+| `--box-round` | 盒子输出的小数位数（默认：3） |
+| `--json` | 以 JSON 格式输出结果 |
 
-## Dependencies
+## 依赖
 
-- **MDAnalysis**: Molecular structure analysis
-- **NumPy**: Numerical computations
-- **Python 3.7+**: Runtime environment
+- **MDAnalysis**: 分子结构分析
+- **NumPy**: 数值计算
+- **Python 3.7+**: 运行环境
 
-## License
+## 许可证
 
-MIT License
+MIT 许可证
 
-## Contributing
+## 贡献
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork 仓库
+2. 创建您的功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交您的更改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 打开 Pull Request
 
-## Citation
+## 引用
 
-If you use selpoc in your research, please cite:
+如果您在研究中使用 selpoc，请引用：
 
 ```
-Your Name. (2025). selpoc: A command-line tool for protein structure analysis 
-and molecular docking box generation. GitHub. https://github.com/yourusername/selpoc
+Your Name. (2025). selpoc: 蛋白质结构分析和分子对接盒子生成的命令行工具。
+GitHub. https://github.com/yourusername/selpoc
 ```
