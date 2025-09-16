@@ -79,9 +79,16 @@ def main():
     elif args.chain and not args.resid:
         sys.exit("[err] --chain can only be used with --resid")
 
-    pdb_path = args.pdb
+    # 处理PDB文件路径（支持相对路径和绝对路径）
+    pdb_path = os.path.abspath(args.pdb)
     if not os.path.isfile(pdb_path):
-        sys.exit(f"[err] PDB not found: {pdb_path} (cwd: {os.getcwd()})")
+        # 如果绝对路径不存在，尝试相对于当前目录
+        pdb_path = os.path.abspath(os.path.join(os.getcwd(), args.pdb))
+        if not os.path.isfile(pdb_path):
+            sys.exit(f"[err] PDB file not found: {args.pdb}\n"
+                     f"      Tried absolute path: {os.path.abspath(args.pdb)}\n"
+                     f"      Tried relative path: {pdb_path}\n"
+                     f"      Current directory: {os.getcwd()}")
 
     # 载入PDB文件
     try:
@@ -240,6 +247,7 @@ def main():
         print(f"Box size   : {np.array(result['box_size'])}")
         if args.radius:
             print(f"Rg         : {result['radius_of_gyration']:.3f}")
+
 
 if __name__ == "__main__":
     main()
