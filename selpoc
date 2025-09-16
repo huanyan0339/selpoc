@@ -173,6 +173,17 @@ def main():
     if ag.n_atoms == 0:
         sys.exit(f"[err] Selection matched 0 atoms: \"{sel_str}\"")
 
+    # 获取并显示选中的残基信息
+    selected_residues = ag.residues
+    print(f"选中的残基信息 ({len(selected_residues)} 个残基):")
+    for residue in selected_residues:
+        chain_id = residue.segment.segid if residue.segment.segid else "?"
+        resid = residue.resid
+        resname = residue.resname
+        n_atoms = len(residue.atoms)
+        print(f"  链{chain_id}-{resid}-{resname} ({n_atoms} 原子)")
+    print()
+
     # 计算
     com = np_arr(ag.center_of_mass())
     bb_min, bb_max = ag.bbox()
