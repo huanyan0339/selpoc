@@ -205,6 +205,6 @@ MIT 许可证
 如果您在研究中使用 selpoc，请引用：
 
 ```
-Your Name. (2025). selpoc: 蛋白质结构分析和分子对接盒子生成的命令行工具。
+Zhang Tao. (2025). selpoc: 蛋白质结构分析和分子对接盒子生成的命令行工具。
 GitHub. https://github.com/yourusername/selpoc
 ```
