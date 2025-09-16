@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+# selpoc: compute COM/COG, bbox and Rg for a selection, with Vina/gnina box output
+import argparse, os, sys, json
+import numpy as np
+
+try:
+    import MDAnalysis as mda
+except Exception:
+    sys.exit("[err] MDAnalysis not found. Install via:\n"
+             "  pip install MDAnalysis\n"
+             "  # or: conda install -c conda-forge mdanalysis")
+
+def np_arr(x): return np.asarray(x, dtype=float)
+
+def parse_resid_range(resid_str):
+    """解析残基范围字符串，如 '470-476' 返回 [470, 471, 472, 473, 474, 475, 476]"""
+    if "-" in resid_str:
+        try:
+            start, end = resid_str.split("-", 1)
+            start, end = int(start), int(end)
+            if start > end:
+                raise ValueError(f"Invalid range: start {start} > end {end}")
+            return list(range(start, end + 1))
+        except ValueError as e:
+            raise ValueError(f"Invalid range format '{resid_str}': {e}")
+    else:
+        return [int(resid_str)]
+
+def main():
+    p = argparse.ArgumentParser(
+        prog="selpoc",
+        description="Compute selection center(s) and bounding-box for a PDB region (plus Vina/gnina box)."
+    )
+    # 必填：PDB 文件
+    p.add_argument("pdb", help="Path to PDB file (required)")
+
+    # 必填二选一：--resid 或 --sel 或 --pdbview
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--resid", nargs="+", type=str,
+                   help="Resid IDs. Formats: '45 67 120' (all chains), "
+                        "'A:45 B:67 A:120' (specific chains), or "
+                        "'470-476' (ranges), 'A:470-476' (chain ranges)")
+    g.add_argument("--sel", type=str,
+                   help='MDAnalysis selection string, e.g. --sel "segid A and resid 45 67 120"')
+    g.add_argument("--pdbview", action="store_true",
+                   help="Show PDB file chain info and residue ranges")
+
+    p.add_argument("--chain", type=str,
+                   help="Chain ID to restrict --resid selection when using simple format, "
+                        "e.g. --chain A --resid 45 67")
+
+    p.add_argument("--geom-center", action="store_true",
+                   help="Also compute center of geometry (COG).")
+    p.add_argument("--radius", action="store_true",
+                   help="Also compute radius of gyration (Rg).")
+
+    # Vina/gnina 盒子输出
+    p.add_argument("--box", action="store_true",
+                   help="Print Vina/gnina-ready flags: --center_x/y/z --size_x/y/z.")
+    p.add_argument("--box-center", choices=["com", "cog"], default="com",
+                   help="Center used for --box (com|cog, default: com).")
+    p.add_argument("--box-pad", type=float, default=0.0,
+                   help="Padding Å added to each side along each axis (default: 0.0).")
+    p.add_argument("--box-round", type=int, default=3,
+                   help="Decimal places for --box output (default: 3).")
+
+    p.add_argument("--json", action="store_true",
+                   help="Output results as JSON.")
+
+    args = p.parse_args()
+
+    # 验证 --chain 只能与简单格式的 --resid 一起使用
+    if args.chain and args.resid:
+        # 检查是否使用了链:残基格式
+        has_chain_format = any(":" in resid for resid in args.resid)
+        if has_chain_format:
+            sys.exit("[err] --chain cannot be used with chain:resid format. "
+                     "Use either '--chain A --resid 45 67' or '--resid A:45 B:67'")
+    elif args.chain and not args.resid:
+        sys.exit("[err] --chain can only be used with --resid")
+
+    pdb_path = args.pdb
+    if not os.path.isfile(pdb_path):
+        sys.exit(f"[err] PDB not found: {pdb_path} (cwd: {os.getcwd()})")
+
+    # 载入PDB文件
+    try:
+        u = mda.Universe(pdb_path)
+    except Exception as e:
+        sys.exit(f"[err] Failed to load PDB: {e}")
+
+    # 如果是 --pdbview 模式，显示链信息并退出
+    if args.pdbview:
+        print(f"PDB File   : {os.path.abspath(pdb_path)}")
+        print(f"Total atoms: {u.atoms.n_atoms}")
+        print(f"Total residues: {u.residues.n_residues}")
+        print(f"Total segments: {u.segments.n_segments}")
+        print()
+        
+        # 显示每条链的信息
+        for seg in u.segments:
+            chain_id = seg.segid if seg.segid else "Unknown"
+            residues = seg.residues
+            if len(residues) > 0:
+                resid_min = residues.resids.min()
+                resid_max = residues.resids.max()
+                print(f"Chain {chain_id:>3}: {len(residues):>4} residues (resid {resid_min:>4} to {resid_max:>4})")
+            else:
+                print(f"Chain {chain_id:>3}: {len(residues):>4} residues")
+        
+        return
+
+    # 组装 selection
+    if args.sel:
+        sel_str = args.sel
+    else:
+        # 使用 --resid，支持两种格式：
+        # 1. 简单格式：--resid 45 67 (配合可选的 --chain)
+        # 2. 链:残基格式：--resid A:45 B:67 A:120
+        
+        # 检查是否使用了链:残基格式
+        has_chain_format = any(":" in resid for resid in args.resid)
+        
+        if has_chain_format:
+            # 解析链:残基格式，支持范围
+            chain_resids = {}  # {chain: [resid1, resid2, ...]}
+            
+            for item in args.resid:
+                if ":" in item:
+                    # 链:残基格式，支持链:范围
+                    try:
+                        chain, resid_part = item.split(":", 1)
+                        resids = parse_resid_range(resid_part)
+                        if chain not in chain_resids:
+                            chain_resids[chain] = []
+                        chain_resids[chain].extend(resids)
+                    except ValueError as e:
+                        sys.exit(f"[err] Invalid chain:resid format: '{item}'. {e}")
+                else:
+                    # 纯数字或范围，但在链:残基格式中不支持
+                    sys.exit("[err] Mixed formats not allowed. Use either "
+                             "'--resid 45 67' or '--resid A:45 B:67'")
+            
+            # 构建选择字符串
+            sel_parts = []
+            for chain, resids in chain_resids.items():
+                resid_str = " ".join(str(r) for r in resids)
+                sel_parts.append(f"(segid {chain} and resid {resid_str})")
+            
+            sel_str = " or ".join(sel_parts)
+            
+        else:
+            # 简单格式：数字或范围残基ID
+            all_resids = []
+            for item in args.resid:
+                try:
+                    resids = parse_resid_range(item)
+                    all_resids.extend(resids)
+                except ValueError as e:
+                    sys.exit(f"[err] Invalid resid format: '{item}'. {e}")
+            
+            resid_str = " ".join(str(x) for x in all_resids)
+            if args.chain:
+                sel_str = f"segid {args.chain} and resid {resid_str}"
+            else:
+                sel_str = f"resid {resid_str}"
+
+    # 选择原子
+    try:
+        ag = u.select_atoms(sel_str)
+    except Exception as e:
+        sys.exit(f"[err] Invalid selection \"{sel_str}\": {e}")
+    if ag.n_atoms == 0:
+        sys.exit(f"[err] Selection matched 0 atoms: \"{sel_str}\"")
+
+    # 计算
+    com = np_arr(ag.center_of_mass())
+    bb_min, bb_max = ag.bbox()
+    bb_min = np_arr(bb_min); bb_max = np_arr(bb_max)
+    size = bb_max - bb_min
+
+    result = {
+        "pdb": os.path.abspath(pdb_path),
+        "selection": sel_str,
+        "n_atoms": int(ag.n_atoms),
+        "center_of_mass": com.tolist(),
+        "bbox_min": bb_min.tolist(),
+        "bbox_max": bb_max.tolist(),
+        "box_size": size.tolist(),
+    }
+
+    need_cog = args.geom_center or (args.box and args.box_center == "cog")
+    if need_cog:
+        cog = np_arr(ag.center_of_geometry())
+        result["center_of_geometry"] = cog.tolist()
+
+    if args.radius:
+        try:
+            rg = float(ag.radius_of_gyration())
+        except Exception:
+            coords = ag.positions.astype(float)
+            diffs = coords - com
+            rg = float(np.sqrt((diffs**2).sum(axis=1).mean()))
+        result["radius_of_gyration"] = rg
+
+    # 盒子输出
+    if args.box:
+        center_vec = com if args.box_center == "com" else np_arr(result["center_of_geometry"])
+        pad = float(args.box_pad)
+        size_vec = size + 2.0 * pad  # 每侧加 pad → 尺寸整体 +2*pad
+        r = args.box_round
+        cx, cy, cz = (round(float(x), r) for x in center_vec)
+        sx, sy, sz = (round(float(x), r) for x in size_vec)
+        print(f"--center_x {cx} --center_y {cy} --center_z {cz} "
+              f"--size_x {sx} --size_y {sy} --size_z {sz}")
+
+    # 常规/JSON 输出
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        np.set_printoptions(precision=3, suppress=True)
+        print(f"PDB        : {result['pdb']}")
+        print(f"Selection  : {result['selection']}  (atoms: {result['n_atoms']})")
+        print(f"Center(COM): {np.array(result['center_of_mass'])}")
+        if need_cog:
+            print(f"Center(COG): {np.array(result['center_of_geometry'])}")
+        print(f"BBox min   : {np.array(result['bbox_min'])}")
+        print(f"BBox max   : {np.array(result['bbox_max'])}")
+        print(f"Box size   : {np.array(result['box_size'])}")
+        if args.radius:
+            print(f"Rg         : {result['radius_of_gyration']:.3f}")
+
+if __name__ == "__main__":
+    main()
