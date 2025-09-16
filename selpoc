@@ -214,6 +214,7 @@ def main():
         "bbox_min": bb_min.tolist(),
         "bbox_max": bb_max.tolist(),
         "box_size": size.tolist(),
+        "box_volume_angstrom3": float(size[0] * size[1] * size[2]),
     }
 
     need_cog = args.geom_center or (args.box and args.box_center == "cog")
@@ -253,7 +254,14 @@ def main():
             print(f"Center(COG): {np.array(result['center_of_geometry'])}")
         print(f"BBox min   : {np.array(result['bbox_min'])}")
         print(f"BBox max   : {np.array(result['bbox_max'])}")
-        print(f"Box size   : {np.array(result['box_size'])}")
+        print(f"Box size   : {np.array(result['box_size'])} Å")
+        
+        # 显示详细的盒子尺寸信息
+        box_x, box_y, box_z = result['box_size']
+        box_volume = box_x * box_y * box_z
+        print(f"Box dims   : X={box_x:.3f} Å, Y={box_y:.3f} Å, Z={box_z:.3f} Å")
+        print(f"Box volume : {box_volume:.3f} Å³")
+        
         if args.radius:
             print(f"Rg         : {result['radius_of_gyration']:.3f}")
 
